@@ -1,0 +1,18 @@
+# Create PVC in GKE.  This does two things:
+# - Creates a PVC called 'myclaim' under the menu item Kubernetes Engine > Storage.
+# - Creates a Disk (dynamically named) under the menu item Compute Engine > Disks.
+---
+# PERSISTENT VOLUME CLAIM
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  namespace: todo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+---

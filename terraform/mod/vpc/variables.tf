@@ -1,0 +1,10 @@
+variable "project_id" {}
+variable "network" {}
+variable "env_name" {}
+variable "subnetwork" {}
+variable "subnetwork_range" {}
+variable "region" {}
+variable "ip_range_pods_name" {}
+variable "ip_range_pods_range" {}
+variable "ip_range_services_name" {}
+variable "ip_range_services_range" {}

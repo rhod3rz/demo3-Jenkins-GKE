@@ -1,0 +1,76 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: todo
+  labels:
+    app: db
+  annotations:
+    kubernetes.io/change-cause: sub_mango
+    # kubernetes.io/change-cause: latest
+spec:
+  selector:
+    matchLabels:
+      app: db
+  replicas: 1                  # Specifies the number of desired Pods
+  strategy:                    # This strategy says we want to add pods one at a time (maxSurge), and there must always be 3 pods ready (replicas).
+    type: RollingUpdate        # Type 'rolling' or 'recreate'.
+    rollingUpdate:             # The deployment updates pods in a rolling update fashion.
+      maxSurge: 1              # maxSurge is the maximum number of new pods that will be created at a time.
+      maxUnavailable: 0        # maxUnavailable is the maximum number of old pods that will be deleted at a time.
+  minReadySeconds: 10          # The min # of secs a new pod should be ready without any of its containers crashing, for it to be considered available.
+  revisionHistoryLimit: 3      # The number of old replicasets to retain to allow rollback.
+  template:
+    metadata:
+      labels:
+        app: db
+        code: mysql
+    spec:
+      containers:
+      - name: db
+        image: mysql:5.7
+        resources:
+          requests:            # Minimum amount of resources requested.
+            cpu: 50m           # 1/20th of a vCPU; a vCPU is 1000m (millicores).
+            memory: 64Mi       # 64 Mebibytes
+          limits:              # Maximum amount of resources requested.
+            cpu: 500m          # 1/2 of a CPU.
+            memory: 4096Mi     # 4096 Mebibytes.
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: sub_apple
+          # value: 3Wa4es5rd!
+        - name: MYSQL_DATABASE
+          value: todos
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/mysql
+          # Error seen: 'initialize specified but the data directory has files in it, aborting'.
+          # subPath required to resolve.
+          subPath: mysql
+      restartPolicy: Always
+      volumes:
+      - name: db-data
+        persistentVolumeClaim:
+          claimName: myclaim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: todo
+  labels:
+    app: db
+spec:
+  selector:
+    app: db
+  ports:
+  - port: 3306
+    protocol: TCP
+    targetPort: 3306
+  type: ClusterIP
+---

@@ -1,0 +1,139 @@
+# Note: It can take 10-20 minutes for the certificate provisioning to complete.
+# Check status of cert creation:
+# kubectl describe managedcertificate todo-app -n prd
+
+# Note: It can take 10-20 minutes for the ingress service to start, Reporting unexpected errors like below until it's started.
+# 404. That's an error. The requested URL / was not found on this server. That's all we know.
+# Error: Server Error. The server encountered a temporary error and could not complete your request. Please try again in 30 seconds.
+# This site can't provide a secure connectionprd. prd.rhod3rz.com uses an unsupported protocol.
+# kubectl describe ingress todo-app -n prd
+---
+# DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app
+  namespace: todo
+  labels:
+    app: todo-app
+  annotations:
+    kubernetes.io/change-cause: sub_mango
+spec:
+  selector:
+    matchLabels:
+      app: todo-app
+  replicas: 1                  # Specifies the number of desired Pods
+  strategy:                    # This strategy says we want to add pods one at a time (maxSurge), and there must always be 3 pods ready (replicas).
+    type: RollingUpdate        # Type 'rolling' or 'recreate'.
+    rollingUpdate:             # The deployment updates pods in a rolling update fashion.
+      maxSurge: 1              # maxSurge is the maximum number of new pods that will be created at a time.
+      maxUnavailable: 0        # maxUnavailable is the maximum number of old pods that will be deleted at a time.
+  minReadySeconds: 10          # The min # of secs a new pod should be ready without any of its containers crashing, for it to be considered available.
+  revisionHistoryLimit: 3      # The number of old replicasets to retain to allow rollback.
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      containers:
+      - name: todo-app
+        image: sub_peach
+        imagePullPolicy: Always
+        resources:
+          requests:            # Minimum amount of resources requested.
+            cpu: 50m           # 1/20th of a vCPU; a vCPU is 1000m (millicores).
+            memory: 64Mi       # 64 Mebibytes
+          limits:              # Maximum amount of resources requested.
+            cpu: 100m          # 1/10th of a CPU.
+            memory: 128Mi      # 128 Mebibytes.
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        env:
+        - name: MYSQL_HOST
+          value: db
+        - name: MYSQL_USER
+          value: root
+        - name: MYSQL_PASSWORD
+          value: sub_apple
+        - name: MYSQL_DB
+          value: todos
+      restartPolicy: Always
+---
+# HORIZONTAL POD AUTOSCALER
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: todo-app-hpa
+  namespace: todo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: todo-app
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 50
+---
+# SERVICE
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-app
+  namespace: todo
+  labels:
+    app: todo-app
+spec:
+  selector:
+    app: todo-app
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 3000
+  type: NodePort
+---
+# TLS CERTIFICATE
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: todo-app
+  namespace: todo
+spec:
+  domains:
+  - prd.rhod3rz.com
+---
+# INGRESS
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: todo-app
+  namespace: todo
+  annotations:
+    # Specifies that the External HTTP(S) Load Balancer will be deployed.
+    kubernetes.io/ingress.class: "gce"
+    # Link static ip 'web-static-ip' to the ingress.
+    kubernetes.io/ingress.global-static-ip-name: web-static-ip
+    # Link tls cert 'todo-app' to the ingress.
+    networking.gke.io/managed-certificates: todo-app
+    # References a policy resource used to enable HTTPS redirects and an SSL policy.
+    networking.gke.io/v1beta1.FrontendConfig: ingress-security-config
+spec:
+  rules:
+  - host: prd.rhod3rz.com
+    http:
+      paths:
+      - backend:
+          serviceName: todo-app
+          servicePort: 5000
+---
+# REDIRECTION
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: ingress-security-config
+  namespace: todo
+spec:
+  sslPolicy: gke-ingress-ssl-policy
+  redirectToHttps:
+    enabled: true
+---

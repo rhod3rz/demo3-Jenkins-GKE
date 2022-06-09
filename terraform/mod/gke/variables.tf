@@ -1,0 +1,10 @@
+variable "project_id" {}
+variable "cluster_name" {}
+variable "env_name" {}
+variable "region" {}
+variable "zones" {}
+variable "network" {}
+variable "subnetwork" {}
+variable "ip_range_pods_name" {}
+variable "ip_range_services_name" {}
+variable "machine_type" {}

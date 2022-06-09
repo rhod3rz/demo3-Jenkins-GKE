@@ -1,0 +1,88 @@
+---
+# DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app
+  namespace: todo
+  labels:
+    app: todo-app
+  annotations:
+    kubernetes.io/change-cause: sub_mango
+    # kubernetes.io/change-cause: latest
+spec:
+  selector:
+    matchLabels:
+      app: todo-app
+  replicas: 1                  # Specifies the number of desired Pods
+  strategy:                    # This strategy says we want to add pods one at a time (maxSurge), and there must always be 3 pods ready (replicas).
+    type: RollingUpdate        # Type 'rolling' or 'recreate'.
+    rollingUpdate:             # The deployment updates pods in a rolling update fashion.
+      maxSurge: 1              # maxSurge is the maximum number of new pods that will be created at a time.
+      maxUnavailable: 0        # maxUnavailable is the maximum number of old pods that will be deleted at a time.
+  minReadySeconds: 10          # The min # of secs a new pod should be ready without any of its containers crashing, for it to be considered available.
+  revisionHistoryLimit: 3      # The number of old replicasets to retain to allow rollback.
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      containers:
+      - name: todo-app
+        image: sub_peach
+        # image: rhod3rz/todo:211012-1127-dev
+        imagePullPolicy: Always
+        resources:
+          requests:            # Minimum amount of resources requested.
+            cpu: 50m           # 1/20th of a vCPU; a vCPU is 1000m (millicores).
+            memory: 64Mi       # 64 Mebibytes
+          limits:              # Maximum amount of resources requested.
+            cpu: 100m          # 1/10th of a CPU.
+            memory: 128Mi      # 128 Mebibytes.
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        env:
+        - name: MYSQL_HOST
+          value: db
+        - name: MYSQL_USER
+          value: root
+        - name: MYSQL_PASSWORD
+          value: sub_apple
+          # value: 3Wa4es5rd!
+        - name: MYSQL_DB
+          value: todos
+      restartPolicy: Always
+---
+# HORIZONTAL POD AUTOSCALER
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: todo-app-hpa
+  namespace: todo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: todo-app
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 50
+---
+# SERVICE
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-app
+  namespace: todo
+  labels:
+    app: todo-app
+spec:
+  selector:
+    app: todo-app
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 3000
+  type: NodePort
+---
